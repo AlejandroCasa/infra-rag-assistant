@@ -1,3 +1,4 @@
+# --- Core Application Dependencies ---
 langchain
 langchain-community
 langchain-core
@@ -8,3 +9,11 @@ chromadb
 streamlit
 python-dotenv
 watchdog
+google-generativeai
+
+# --- Development & Quality Tools ---
+black
+isort
+mypy
+types-requests
+types-PyYAML
