@@ -1,6 +1,7 @@
 import os
-from dotenv import load_dotenv
+
 import google.generativeai as genai
+from dotenv import load_dotenv
 
 # Cargar API Key
 load_dotenv()
@@ -20,10 +21,10 @@ try:
     found = False
     for m in genai.list_models():
         # Filtramos solo los modelos que sirven para chatear (generateContent)
-        if 'generateContent' in m.supported_generation_methods:
+        if "generateContent" in m.supported_generation_methods:
             print(f"✅ Disponible: {m.name}")
             found = True
-    
+
     if not found:
         print("⚠️ No se encontraron modelos compatibles con 'generateContent'.")
 

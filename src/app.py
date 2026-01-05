@@ -6,19 +6,21 @@ Zero dependency on legacy 'langchain.chains'.
 
 import os
 import time
+
 import streamlit as st
 from dotenv import load_dotenv
 
-# --- IMPORTS QUE SÍ FUNCIONAN (CORE) ---
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_huggingface import HuggingFaceEmbeddings
 # Usamos langchain_chroma (que instalamos manualmente)
-from langchain_chroma import Chroma 
+from langchain_chroma import Chroma
+from langchain_core.output_parsers import StrOutputParser
 
 # --- AQUÍ ESTÁ EL TRUCO: Usamos Core, no Chains ---
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
-from langchain_core.output_parsers import StrOutputParser
+
+# --- IMPORTS QUE SÍ FUNCIONAN (CORE) ---
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_huggingface import HuggingFaceEmbeddings
 
 # --- Configuración ---
 load_dotenv()
@@ -30,30 +32,29 @@ EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 st.set_page_config(page_title="InfraOps Guardian", page_icon="🛡️", layout="wide")
 
+
 def format_docs(docs):
     """Helper to join retrieved documents into a single string."""
     return "\n\n".join(doc.page_content for doc in docs)
 
+
 def init_rag_pipeline():
     # 1. Embeddings & DB
     embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
-    
+
     if not os.path.exists(DB_PATH):
         st.error(f"❌ DB not found at {DB_PATH}.")
         return None
 
-    vector_db = Chroma(
-        persist_directory=DB_PATH,
-        embedding_function=embeddings
-    )
+    vector_db = Chroma(persist_directory=DB_PATH, embedding_function=embeddings)
     # Recuperador (Retriever)
     retriever = vector_db.as_retriever(search_kwargs={"k": 3})
-    
+
     # 2. LLM
     if not GOOGLE_API_KEY:
         st.error("❌ GOOGLE_API_KEY missing.")
         return None
-        
+
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
         google_api_key=GOOGLE_API_KEY,
@@ -79,13 +80,14 @@ def init_rag_pipeline():
         | llm
         | StrOutputParser()
     )
-    
+
     return rag_chain
+
 
 def main():
     st.title("🛡️ InfraOps Guardian (Pure LCEL)")
     st.caption("Running on Python 3.13 - No Legacy Chains")
-    
+
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
@@ -101,7 +103,7 @@ def main():
         with st.chat_message("assistant"):
             placeholder = st.empty()
             placeholder.markdown("⚡ *Processing (Core Logic)...*")
-            
+
             try:
                 chain = init_rag_pipeline()
                 if chain:
@@ -109,13 +111,14 @@ def main():
                     # Invocación directa
                     response = chain.invoke(input_text)
                     end = time.time()
-                    
+
                     full_resp = f"{response}\n\n*(Latency: {end - start:.2f}s)*"
-                    
+
                     placeholder.markdown(full_resp)
                     st.session_state.messages.append({"role": "assistant", "content": full_resp})
             except Exception as e:
                 placeholder.error(f"Error: {e}")
+
 
 if __name__ == "__main__":
     main()
