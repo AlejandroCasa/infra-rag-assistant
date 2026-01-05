@@ -1,0 +1,23 @@
+[tool.black]
+line-length = 100
+target-version = ['py310']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true  # Vital para librerías como LangChain que a veces no tienen types perfectos
+
+[tool.pylint.messages_control]
+disable = [
+    "C0114", # Missing module docstring (a veces es excesivo)
+    "C0116", # Missing function or method docstring (lo activaremos selectivamente)
+    "E0401", # Import errors (deja que mypy maneje esto)
+    "R0903", # Too few public methods (común en clases de configuración)
+]
+max-line-length = 100
