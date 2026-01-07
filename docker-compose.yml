@@ -1,0 +1,14 @@
+services:
+  infra-guardian:
+    build: .
+    container_name: infra-guardian
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env  # Read environment variables from .env file
+    volumes:
+      # Mount persistent storage for vector database
+      - ./vector_db:/app/vector_db
+      # Optional: Mount data to add files without rebuilding
+      - ./data:/app/data
+    restart: unless-stopped
