@@ -6,6 +6,7 @@ langchain-google-genai
 langchain-huggingface
 langchain-chroma
 chromadb
+sentence-transformers
 streamlit
 python-dotenv
 watchdog
