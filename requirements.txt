@@ -18,3 +18,5 @@ isort
 mypy
 types-requests
 types-PyYAML
+pytest
+pytest-dotenv
