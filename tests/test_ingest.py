@@ -1,7 +1,11 @@
-import pytest
+"""
+Unit tests for the data ingestion and security redaction logic.
+"""
+
 from src.ingest import redact_secrets
 
-def test_redact_password():
+
+def test_redact_password() -> None:
     """
     Test that a standard password assignment is redacted.
     """
@@ -9,7 +13,8 @@ def test_redact_password():
     expected = 'password = "[REDACTED]"'
     assert redact_secrets(raw_tf) == expected
 
-def test_redact_aws_keys():
+
+def test_redact_aws_keys() -> None:
     """
     Test that AWS keys are redacted.
     """
@@ -26,7 +31,8 @@ def test_redact_aws_keys():
     assert 'access_key = "[REDACTED]"' in sanitized
     assert 'secret_key = "[REDACTED]"' in sanitized
 
-def test_ignore_safe_values():
+
+def test_ignore_safe_values() -> None:
     """
     Test that non-secret values are NOT redacted.
     """
