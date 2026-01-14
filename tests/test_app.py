@@ -89,6 +89,7 @@ def test_format_chat_history() -> None:
     assert isinstance(langchain_history[1], AIMessage)
     assert langchain_history[1].content == "Hi there"
 
+
 @pytest.mark.skipif(
     os.getenv("CI") is not None,
     reason="Skipping DB existence check in CI environment (no ingestion run)",
