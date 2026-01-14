@@ -1,6 +1,7 @@
 """
 Frontend Application for Infrastructure RAG Assistant.
-Architecture: Pure LCEL + Mermaid.js Visualization + Conversational Memory.
+Architecture: Pure LCEL + Mermaid.js Visualization + Conversational Memory + Source Citations.
+Supports fetching data from Local Storage or GitHub.
 """
 
 import os
@@ -12,6 +13,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
 from langchain_chroma import Chroma
+from langchain_core.documents import Document
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -22,7 +24,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 # --- Configuration ---
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL")  # New: Fetch Repo Info
+GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL")
 
 # Define base paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -53,16 +55,41 @@ def render_mermaid(code: str) -> None:
     components.html(html_code, height=500, scrolling=True)
 
 
-def format_docs(docs: List[Any]) -> str:
+def format_docs(docs: List[Document]) -> str:
     """
-    Format retrieved documents into a single string.
+    Format retrieved documents into a single string with source attribution.
+    It prepends the filename to each chunk of text so the LLM knows the origin.
+
+    Args:
+        docs (List[Document]): List of retrieved documents.
+
+    Returns:
+        str: Combined content with source metadata.
     """
-    return "\n\n".join(doc.page_content for doc in docs)
+    formatted_chunks = []
+    for doc in docs:
+        # Extract filename from path (e.g., /data/main.tf -> main.tf)
+        # Note: ingest.py must ensure 'source' metadata is present.
+        source_path = doc.metadata.get("source", "Unknown Source")
+        filename = os.path.basename(source_path)
+
+        # Structure the context so the LLM can reference it
+        chunk = f"--- SOURCE FILE: {filename} ---\n{doc.page_content}\n"
+        formatted_chunks.append(chunk)
+
+    return "\n".join(formatted_chunks)
 
 
 def format_chat_history(messages: List[Dict[str, Any]]) -> List[BaseMessage]:
     """
     Converts Streamlit session state messages into LangChain message objects.
+    This allows the LLM to understand the context of the conversation.
+
+    Args:
+        messages (List[Dict[str, Any]]): List of message dictionaries from st.session_state.
+
+    Returns:
+        List[BaseMessage]: List of HumanMessage and AIMessage objects.
     """
     history: List[BaseMessage] = []
     for msg in messages:
@@ -77,8 +104,8 @@ def main() -> None:
     """
     Main function to render the Streamlit application.
     """
-    st.title("🛡️ InfraOps Guardian")
-    st.caption("Context-aware RAG Assistant")
+    st.title("🛡️ InfraOps Guardian (Audit Edition)")
+    st.caption("Context-aware RAG Assistant with Source Attribution")
 
     # --- Sidebar: Repository Info ---
     with st.sidebar:
@@ -88,7 +115,7 @@ def main() -> None:
             st.markdown("---")
         else:
             st.info("Using Local Data")
-        
+
         st.caption(f"Embedding: {EMBEDDING_MODEL_NAME}")
 
     # Initialize chat history in session state
@@ -121,11 +148,12 @@ def main() -> None:
             placeholder.markdown("⚡ *Thinking...*")
 
             try:
-                # Prepare inputs
+                # Prepare inputs: Context from DB + Conversation History
                 chat_history_objects = format_chat_history(
                     st.session_state.messages[:-1]
                 )
 
+                # Initialize Resources (Embeddings & Vector DB)
                 embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
 
                 if not os.path.exists(DB_PATH):
@@ -137,6 +165,7 @@ def main() -> None:
                 )
                 retriever = vector_db.as_retriever(search_kwargs={"k": 5})
 
+                # Initialize LLM
                 if not GOOGLE_API_KEY:
                     st.error("❌ GOOGLE_API_KEY missing in environment.")
                     return
@@ -147,14 +176,18 @@ def main() -> None:
                     temperature=0,
                 )
 
+                # Prompt Template with Citations Instruction
                 system_prompt = """You are a Senior Cloud Architect.
                 Answer based on the following context and the conversation history.
 
-                IMPORTANT: If the user asks for a diagram, visualization, or flow:
-                1. Use Mermaid.js syntax.
-                2. Wrap the code strictly in ```mermaid ... ``` blocks.
-                3. Use 'graph TD' (Top-Down) or 'graph LR' (Left-Right).
-                4. CRITICAL: Enclose ALL node labels in double quotes. Example: id{{"Label"}}
+                RULES:
+                1. Always cite the source file name (e.g., 'According to main.tf...') when mentioning resources.
+                2. At the end of your response, list the 'Sources Used'.
+                
+                VISUALIZATION:
+                - If asked for a diagram, use Mermaid.js syntax wrapped in ```mermaid ... ```.
+                - Use 'graph TD' (Top-Down) or 'graph LR' (Left-Right).
+                - CRITICAL: Enclose node labels in double quotes. Example: id{{"Label"}}
 
                 Context:
                 {context}
@@ -168,6 +201,7 @@ def main() -> None:
                     ]
                 )
 
+                # Construct LCEL Chain
                 # Type annotation added for mypy strictness
                 chain: Runnable = (
                     {
@@ -180,12 +214,15 @@ def main() -> None:
                     | StrOutputParser()
                 )
 
+                # Invoke Chain
                 response = chain.invoke(
                     {"question": input_text, "chat_history": chat_history_objects}
                 )
 
+                # 3. Render Response
                 placeholder.markdown(response)
 
+                # 4. Check for Mermaid diagrams in response
                 mermaid_blocks = re.findall(
                     r"```mermaid\n(.*?)\n```", response, re.DOTALL
                 )
@@ -193,6 +230,7 @@ def main() -> None:
                     st.caption("📊 Architecture Diagram:")
                     render_mermaid(block)
 
+                # 5. Save assistant response to history
                 st.session_state.messages.append(
                     {"role": "assistant", "content": response}
                 )
