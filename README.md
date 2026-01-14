@@ -90,3 +90,12 @@ Try these prompts to see the full power of the assistant:
 * ✅ Automatic ingestion of new Terraform resources.
 * ✅ **Native Mermaid.js support** for architecture diagrams.
 * ✅ Dockerized for easy deployment.
+
+## 🛠️ GitHub Repository Ingestion (New Feature)
+
+You can now ingest Terraform files directly from a public GitHub repository instead of a local folder.
+
+1. **Configure the Repo:**
+   Create or update your `.env` file with the target repository URL:
+   ```bash
+   GITHUB_REPO_URL="https://github.com/stacksimplify/terraform-on-aws-ec2"

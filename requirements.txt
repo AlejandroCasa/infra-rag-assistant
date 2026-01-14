@@ -11,6 +11,7 @@ streamlit
 python-dotenv
 watchdog
 google-generativeai
+GitPython
 
 # --- Development & Quality Tools ---
 black
