@@ -16,6 +16,8 @@ import shutil
 import sys
 from typing import List, Optional
 
+from dotenv import load_dotenv
+
 # Third-party imports
 from git import Repo  # type: ignore
 from langchain_chroma import Chroma
@@ -23,7 +25,6 @@ from langchain_community.document_loaders import TextLoader
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from dotenv import load_dotenv
 
 # --- Configuration ---
 load_dotenv()
@@ -34,7 +35,9 @@ DB_PATH = os.path.join(BASE_DIR, "vector_db")
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 # Git Configuration
-GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL")  # Example: https://github.com/hashicorp/terraform-provider-aws
+GITHUB_REPO_URL = os.getenv(
+    "GITHUB_REPO_URL"
+)  # Example: https://github.com/hashicorp/terraform-provider-aws
 CLONE_PATH = os.path.join(BASE_DIR, "data", "cloned_repo")
 
 
@@ -49,9 +52,7 @@ def redact_secrets(text: str) -> str:
     Returns:
         str: The sanitized text with secrets replaced by [REDACTED].
     """
-    pattern = (
-        r'(?i)(\b(?:password|secret|key|token|access_key|secret_key)\b\s*=\s*)"([^"]+)"'
-    )
+    pattern = r'(?i)(\b(?:password|secret|key|token|access_key|secret_key)\b\s*=\s*)"([^"]+)"'
     redacted_text = re.sub(pattern, r'\1"[REDACTED]"', text)
     return redacted_text
 
@@ -77,9 +78,11 @@ def clone_repository(repo_url: str, target_path: str) -> bool:
         # On Windows, git files can be read-only, causing permission errors with rmtree
         # We handle this by using a custom error handler or simply try/except (simplified here)
         try:
+
             def on_rm_error(func, path, exc_info):
                 os.chmod(path, 0o777)
                 func(path)
+
             shutil.rmtree(target_path, onerror=on_rm_error)
         except Exception as e:
             print(f"❌ Error cleaning directory: {e}")
@@ -177,9 +180,7 @@ def main() -> None:
         embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
 
         # Create or update the vector store
-        Chroma.from_documents(
-            documents=chunks, embedding=embeddings, persist_directory=DB_PATH
-        )
+        Chroma.from_documents(documents=chunks, embedding=embeddings, persist_directory=DB_PATH)
         print(f"✅ Success! Embeddings saved to {DB_PATH}")
 
     except Exception as e:

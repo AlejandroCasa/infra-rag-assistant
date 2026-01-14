@@ -48,9 +48,7 @@ def test_mermaid_regex_detection() -> None:
     mermaid_blocks = re.findall(r"```mermaid\n(.*?)\n```", mock_response, re.DOTALL)
 
     assert len(mermaid_blocks) == 1, "Should detect exactly one mermaid block"
-    assert (
-        "graph TD" in mermaid_blocks[0]
-    ), "The block content should be extracted correctly"
+    assert "graph TD" in mermaid_blocks[0], "The block content should be extracted correctly"
     assert "```" not in mermaid_blocks[0], "Captured content should not contain backticks"
 
 
@@ -96,6 +94,4 @@ def test_vector_db_existence() -> None:
     """
     Test that the Vector DB directory exists (implies ingestion ran).
     """
-    assert os.path.exists(
-        DB_PATH
-    ), f"Vector DB should exist at {DB_PATH}. Did you run ingest.py?"
+    assert os.path.exists(DB_PATH), f"Vector DB should exist at {DB_PATH}. Did you run ingest.py?"

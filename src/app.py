@@ -129,9 +129,7 @@ def main() -> None:
             # Check if there is a mermaid block to render in history
             content = str(message["content"])
             if "```mermaid" in content:
-                mermaid_blocks = re.findall(
-                    r"```mermaid\n(.*?)\n```", content, re.DOTALL
-                )
+                mermaid_blocks = re.findall(r"```mermaid\n(.*?)\n```", content, re.DOTALL)
                 for block in mermaid_blocks:
                     render_mermaid(block)
 
@@ -149,9 +147,7 @@ def main() -> None:
 
             try:
                 # Prepare inputs: Context from DB + Conversation History
-                chat_history_objects = format_chat_history(
-                    st.session_state.messages[:-1]
-                )
+                chat_history_objects = format_chat_history(st.session_state.messages[:-1])
 
                 # Initialize Resources (Embeddings & Vector DB)
                 embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
@@ -160,9 +156,7 @@ def main() -> None:
                     st.error("❌ Vector DB not found. Please run ingest.py first.")
                     return
 
-                vector_db = Chroma(
-                    persist_directory=DB_PATH, embedding_function=embeddings
-                )
+                vector_db = Chroma(persist_directory=DB_PATH, embedding_function=embeddings)
                 retriever = vector_db.as_retriever(search_kwargs={"k": 5})
 
                 # Initialize LLM
@@ -223,17 +217,13 @@ def main() -> None:
                 placeholder.markdown(response)
 
                 # 4. Check for Mermaid diagrams in response
-                mermaid_blocks = re.findall(
-                    r"```mermaid\n(.*?)\n```", response, re.DOTALL
-                )
+                mermaid_blocks = re.findall(r"```mermaid\n(.*?)\n```", response, re.DOTALL)
                 for block in mermaid_blocks:
                     st.caption("📊 Architecture Diagram:")
                     render_mermaid(block)
 
                 # 5. Save assistant response to history
-                st.session_state.messages.append(
-                    {"role": "assistant", "content": response}
-                )
+                st.session_state.messages.append({"role": "assistant", "content": response})
 
             except Exception as e:
                 placeholder.error(f"Error: {e}")
