@@ -1,116 +1,124 @@
 # 🛡️ InfraOps Guardian
 
-A context-aware RAG (Retrieval-Augmented Generation) assistant for DevOps infrastructure. It allows you to chat with your Terraform code, **visualize architecture diagrams**, and maintains **conversational memory**.
+A context-aware RAG (Retrieval-Augmented Generation) assistant for DevOps infrastructure. It allows you to chat with your Terraform code, **visualize architecture diagrams**, maintain **conversational memory**, and perform **security audits**.
 
 ## 🚀 Tech Stack (2026 Edition)
 - **Language:** Python 3.13
-- **Framework:** LangChain 0.3 (Pure LCEL)
-- **LLM:** Google Gemini 2.5 Flash
-- **Vector DB:** ChromaDB (Local & Dockerized)
-- **Frontend:** Streamlit
+- **Framework:** LangChain 0.3 (Pure LCEL Architecture)
+- **LLM:** Google Gemini 2.5 Flash (Adaptive Temperature)
+- **Vector DB:** ChromaDB (Local & Persistent)
+- **Frontend:** Streamlit (Dual-Mode Interface)
 - **Visualization:** Mermaid.js (Auto-rendered)
-- **Deployment:** Docker & Docker Compose
+- **Deployment:** Docker (CPU-Optimized) & GitHub Actions (CI/CD)
+
+## ✨ Key Features
+
+1.  **Dual Operation Modes:**
+    * 👷 **Architect Mode:** Helps you understand infrastructure, visualize flows, and draft configurations.
+    * 🕵️ **Auditor Mode:** Validates code against CIS Benchmarks, NIST, and PCI-DSS standards using an aggressive retrieval strategy.
+2.  **Git Repository Ingestion:** Directly clone and ingest Terraform code from any public GitHub repository.
+3.  **Conversational Memory:** Remembers context across multiple queries (e.g., "What about the security group?" -> "Does *it* allow port 22?").
+4.  **Source Attribution:** Every answer cites the specific `.tf` file used as a reference.
+5.  **Native Visualization:** Generates and renders architecture diagrams on the fly.
+6.  **Secure by Default:** Automatically redacts secrets/passwords during ingestion.
+
+---
 
 ## 🛠️ Installation & Setup
 
 ### Option A: Docker (Recommended)
-The easiest way to run the full stack (App + DB) in an isolated environment.
+Running in Docker guarantees an isolated environment with CPU-optimized dependencies.
 
-1. **Build and Run:**
-   ```bash
-   docker-compose up --build
-Access: Open http://localhost:8501
+1.  **Configure Environment:**
+    Create a `.env` file in the root directory:
+    ```env
+    GOOGLE_API_KEY=your_google_api_key
+    # Optional: Target a specific repo (leave empty for local data)
+    GITHUB_REPO_URL="[https://github.com/terraform-aws-modules/terraform-aws-vpc](https://github.com/terraform-aws-modules/terraform-aws-vpc)"
+    ```
 
-Option B: Local Python Dev
-Setup Environment:
+2.  **Build and Run:**
+    ```bash
+    docker-compose up --build
+    ```
+    *The container will automatically handle data ingestion if the database is empty.*
 
-Bash
+3.  **Access:**
+    Open http://localhost:8501
 
-python -m venv venv
-./venv/Scripts/activate  # Windows
-pip install -r requirements.txt
-Ingest Data:
+### Option B: Local Development
+1.  **Setup Virtual Environment:**
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # Linux/Mac
+    .\venv\Scripts\activate   # Windows
+    ```
 
-Bash
+2.  **Install Dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-python src/ingest.py
-Run App:
+3.  **Ingest Data:**
+    ```bash
+    python src/ingest.py
+    ```
 
-Bash
+4.  **Run Application:**
+    ```bash
+    python -m streamlit run src/app.py
+    ```
 
-python -m streamlit run src/app.py
-🛠️ GitHub Repository Ingestion (New Feature)
-You can now ingest Terraform files directly from a public GitHub repository instead of a local folder.
+---
 
-Configure the Repo: Create or update your .env file with the target repository URL:
+## 🕵️ Security Auditor Mode (SecOps)
 
-Bash
+Turn your assistant into a ruthless security auditor with a single click.
 
-# Example: Complex AWS VPC Module
-GITHUB_REPO_URL="[https://github.com/terraform-aws-modules/terraform-aws-vpc](https://github.com/terraform-aws-modules/terraform-aws-vpc)"
-(Note: Remove this line or leave it empty to fallback to local data/ folder)
+1.  **Activate:** Toggle the **"🕵️ Security Auditor Mode"** switch in the sidebar.
+2.  **Behavior Change:**
+    * **Persona:** Shifts from "Helpful Architect" to "Paranoid Auditor".
+    * **Retrieval:** Increases search depth (`k=7`) to find cross-resource vulnerabilities.
+    * **Standards:** Analyzes code against **CIS Benchmarks**, **NIST**, and **PCI-DSS**.
+3.  **Example Audit Prompts:**
+    * *"Perform a vulnerability scan on the Security Groups. Are there open ingress rules?"*
+    * *"Does the S3 bucket configuration comply with encryption standards?"*
+    * *"Identify any hardcoded credentials or permissive IAM roles."*
 
-Run Ingestion:
+---
 
-Bash
+## 🎯 Demo Scenarios
 
-python src/ingest.py
-This will clone the repo, process all .tf files, and update the vector database.
+Use these scenarios to test the capabilities using the `terraform-aws-vpc` module or your own code.
 
-🎯 Demo Scenarios & Prompts
-Use these scenarios to validate the specific features of the assistant.
+### 🔍 Complex Logic Analysis
+* *"What variable controls whether a single NAT Gateway is used for all zones? What is its default value?"*
+* *"Explain the logic used to create private subnets. Which Terraform resource is used?"*
 
-Scenario A: Complex Logic Analysis (using AWS VPC Repo)
-Target Repo: terraform-aws-modules/terraform-aws-vpc
+### 📊 Architecture Visualization
+* *"Generate a Mermaid diagram showing the relationship between the VPC, Public Subnets, and the Internet Gateway."*
+* *"Visualize the decision flow for enabling VPN Gateway."*
 
-Understanding Variables:
+### 📜 Source Audit
+* *"Where is the CIDR block defined?"*
+    * *✅ Success:* The bot should reply "According to **variables.tf**..." and list the file in the sources.
 
-"What variable controls whether a single NAT Gateway is used for all zones? What is its default value?"
+---
 
-Conditional Logic:
+## 🧑‍💻 Engineering Standards & CI/CD
 
-"Explain the logic used to create private subnets. Which Terraform resource is used?"
+This project is built with strict quality gates enforced by **GitHub Actions**:
 
-Outputs:
+* **Linting:** `black` (Formatting) & `isort` (Imports).
+* **Type Safety:** `mypy` (Strict Static Typing).
+* **Testing:** `pytest` suite with Mocking for Git and Database checks.
+* **Docker Optimization:** The build pipeline forces `torch` CPU-only version, reducing image size from **~8GB to <1GB**.
 
-"List the critical outputs exposed by this module that I would need to connect an EKS cluster."
+To run checks locally:
+```bash
+# Format code
+./venv/Scripts/python -m black .
+./venv/Scripts/python -m isort .
 
-Scenario B: Architecture Visualization
-Topology:
-
-"Generate a Mermaid diagram showing the relationship between the VPC, Public Subnets, and the Internet Gateway."
-
-Flow:
-
-"Visualize the decision flow for enabling VPN Gateway."
-
-Scenario C: Audit & Citations
-Source Attribution:
-
-"Where is the CIDR block defined?" ✅ Success: The bot should reply "According to variables.tf..." and list the file in the sources.
-
-🧑‍💻 Quality Assurance
-This project adheres to strict coding standards. To verify the codebase:
-
-Bash
-
-# Format Code
-black . && isort .
-
-# Static Type Checking
-mypy src/
-
-# Run Unit Tests
+# Run tests
 pytest
-🧠 Project Status
-✅ Dockerized: Works on Windows/Linux/Mac.
-
-✅ Memory: Remembers previous questions.
-
-✅ Visuals: Native diagram rendering.
-
-✅ Secure: Auto-redaction of secrets during ingestion.
-
-✅ Git Integration: Ingest directly from GitHub URLs.
-
-✅ Auditable: Answers cite specific source files.

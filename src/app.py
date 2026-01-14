@@ -1,7 +1,7 @@
 """
 Frontend Application for Infrastructure RAG Assistant.
 Architecture: Pure LCEL + Mermaid.js Visualization + Conversational Memory + Source Citations.
-Supports fetching data from Local Storage or GitHub.
+Modes: Architect (Builder) vs Auditor (SecOps).
 """
 
 import os
@@ -69,7 +69,6 @@ def format_docs(docs: List[Document]) -> str:
     formatted_chunks = []
     for doc in docs:
         # Extract filename from path (e.g., /data/main.tf -> main.tf)
-        # Note: ingest.py must ensure 'source' metadata is present.
         source_path = doc.metadata.get("source", "Unknown Source")
         filename = os.path.basename(source_path)
 
@@ -104,17 +103,30 @@ def main() -> None:
     """
     Main function to render the Streamlit application.
     """
-    st.title("🛡️ InfraOps Guardian (Audit Edition)")
-    st.caption("Context-aware RAG Assistant with Source Attribution")
+    st.title("🛡️ InfraOps Guardian")
 
-    # --- Sidebar: Repository Info ---
+    # --- Sidebar Controls ---
     with st.sidebar:
-        st.header("📂 Data Source")
-        if GITHUB_REPO_URL:
-            st.success(f"Linked to: {GITHUB_REPO_URL}")
-            st.markdown("---")
+        st.header("⚙️ Operation Mode")
+
+        # 1. Security Toggle (Switch between Architect and Auditor)
+        is_security_mode = st.toggle("🕵️ Security Auditor Mode", value=False)
+
+        if is_security_mode:
+            st.warning("⚠️ MODE: PARANOID. Analyzing for vulnerabilities (CIS/NIST).")
         else:
-            st.info("Using Local Data")
+            st.info("ℹ️ MODE: ARCHITECT. Helping you build and visualize.")
+
+        st.divider()
+
+        # 2. Repo Info
+        st.caption("📂 Data Source")
+        if GITHUB_REPO_URL:
+            # Show only the repo name for brevity
+            repo_name = GITHUB_REPO_URL.split("/")[-1]
+            st.success(f"Repo: {repo_name}")
+        else:
+            st.info("Local Data")
 
         st.caption(f"Embedding: {EMBEDDING_MODEL_NAME}")
 
@@ -129,12 +141,14 @@ def main() -> None:
             # Check if there is a mermaid block to render in history
             content = str(message["content"])
             if "```mermaid" in content:
-                mermaid_blocks = re.findall(r"```mermaid\n(.*?)\n```", content, re.DOTALL)
+                mermaid_blocks = re.findall(
+                    r"```mermaid\n(.*?)\n```", content, re.DOTALL
+                )
                 for block in mermaid_blocks:
                     render_mermaid(block)
 
     # Chat Input Handler
-    if input_text := st.chat_input("Ask about your infrastructure..."):
+    if input_text := st.chat_input("Input command..."):
         # 1. Append user message immediately to UI
         st.session_state.messages.append({"role": "user", "content": input_text})
         with st.chat_message("user"):
@@ -143,21 +157,34 @@ def main() -> None:
         # 2. Process with Assistant
         with st.chat_message("assistant"):
             placeholder = st.empty()
-            placeholder.markdown("⚡ *Thinking...*")
+
+            # Dynamic status message based on mode
+            if is_security_mode:
+                placeholder.markdown("🕵️ *Auditing Codebase...*")
+            else:
+                placeholder.markdown("⚡ *Architecting...*")
 
             try:
                 # Prepare inputs: Context from DB + Conversation History
-                chat_history_objects = format_chat_history(st.session_state.messages[:-1])
+                chat_history_objects = format_chat_history(
+                    st.session_state.messages[:-1]
+                )
 
-                # Initialize Resources (Embeddings & Vector DB)
+                # Initialize Resources
                 embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
 
                 if not os.path.exists(DB_PATH):
                     st.error("❌ Vector DB not found. Please run ingest.py first.")
                     return
 
-                vector_db = Chroma(persist_directory=DB_PATH, embedding_function=embeddings)
-                retriever = vector_db.as_retriever(search_kwargs={"k": 5})
+                vector_db = Chroma(
+                    persist_directory=DB_PATH, embedding_function=embeddings
+                )
+
+                # --- ADAPTIVE RETRIEVAL ---
+                # In Security Mode, we increase 'k' (retrieval depth) to catch cross-resource issues.
+                k_retrieval = 7 if is_security_mode else 5
+                retriever = vector_db.as_retriever(search_kwargs={"k": k_retrieval})
 
                 # Initialize LLM
                 if not GOOGLE_API_KEY:
@@ -167,25 +194,43 @@ def main() -> None:
                 llm = ChatGoogleGenerativeAI(
                     model="gemini-2.5-flash",
                     google_api_key=GOOGLE_API_KEY,
-                    temperature=0,
+                    temperature=0,  # Always 0 for deterministic code analysis
                 )
 
-                # Prompt Template with Citations Instruction
-                system_prompt = """You are a Senior Cloud Architect.
-                Answer based on the following context and the conversation history.
+                # --- DYNAMIC PROMPT ENGINEERING ---
+                if is_security_mode:
+                    system_prompt = """You are an Elite DevSecOps Auditor (Red Team).
+                    Your goal is to find security holes, misconfigurations, and compliance violations (CIS, NIST, PCI).
+                    
+                    TONE:
+                    - Critical, direct, and "Paranoid".
+                    - Do not sugarcoat. If something is insecure, state "CRITICAL RISK".
+                    
+                    OUTPUT FORMAT:
+                    1. 🚨 **Vulnerability Analysis**: List issues found.
+                    2. 🔥 **Severity**: [CRITICAL / HIGH / MEDIUM / LOW]
+                    3. 🛡️ **Remediation**: Specific Terraform code fix.
+                    4. 📜 **Reference**: Cite the source file AND the security standard (e.g., CIS 4.1).
 
-                RULES:
-                1. Always cite the source file name (e.g., 'According to main.tf...') when mentioning resources.
-                2. At the end of your response, list the 'Sources Used'.
-                
-                VISUALIZATION:
-                - If asked for a diagram, use Mermaid.js syntax wrapped in ```mermaid ... ```.
-                - Use 'graph TD' (Top-Down) or 'graph LR' (Left-Right).
-                - CRITICAL: Enclose node labels in double quotes. Example: id{{"Label"}}
+                    Context:
+                    {context}
+                    """
+                else:
+                    system_prompt = """You are a Senior Cloud Architect.
+                    Answer based on the following context and the conversation history.
 
-                Context:
-                {context}
-                """
+                    RULES:
+                    1. Always cite the source file name (e.g., 'According to main.tf...') when mentioning resources.
+                    2. At the end of your response, list the 'Sources Used'.
+                    
+                    VISUALIZATION:
+                    - If asked for a diagram, use Mermaid.js syntax wrapped in ```mermaid ... ```.
+                    - Use 'graph TD' (Top-Down) or 'graph LR' (Left-Right).
+                    - CRITICAL: Enclose node labels in double quotes. Example: id{{"Label"}}
+
+                    Context:
+                    {context}
+                    """
 
                 prompt = ChatPromptTemplate.from_messages(
                     [
@@ -217,13 +262,17 @@ def main() -> None:
                 placeholder.markdown(response)
 
                 # 4. Check for Mermaid diagrams in response
-                mermaid_blocks = re.findall(r"```mermaid\n(.*?)\n```", response, re.DOTALL)
+                mermaid_blocks = re.findall(
+                    r"```mermaid\n(.*?)\n```", response, re.DOTALL
+                )
                 for block in mermaid_blocks:
                     st.caption("📊 Architecture Diagram:")
                     render_mermaid(block)
 
                 # 5. Save assistant response to history
-                st.session_state.messages.append({"role": "assistant", "content": response})
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": response}
+                )
 
             except Exception as e:
                 placeholder.error(f"Error: {e}")
